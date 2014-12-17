@@ -6,12 +6,18 @@ Reference
 ====
 http://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
 
-Format of input file
+DAG
 ====
-Number of tasks, Number of processors
+The random DAGs are created by TGFF. For details, see the following.
+http://ziyang.eecs.umich.edu/~dickrp/tgff/
 
-Matrix of computational overhead
+Format of tgff file
+====
+section {
+	1. Tasks
+	2. Edges
+}
 
-Matrix of transmission speed between processor
-
-Matrix of transmitted data between tasks
+section {
+	1. Matrix of computational overhead
+}
