@@ -1,4 +1,5 @@
 from __future__ import division
+from dag.create_input import init
 
 
 # Time duration about a task
@@ -38,52 +39,38 @@ class HEFT:
     rate = []
     data = []
 
-    def __init__(self, input_file):
-        f = file(input_file, 'r')
-        line = f.readline().strip().split()
-        HEFT.num_task = int(line[0])
-        HEFT.num_processor = int(line[1])
-        f.readline()    # blank line
+    def __init__(self):
+        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init()
 
-        HEFT.tasks = [Task(n) for n in range(HEFT.num_task)]
-        HEFT.processors = [Processor(n) for n in range(HEFT.num_processor)]
+        self.tasks = [Task(n) for n in range(self.num_task)]
+        self.processors = [Processor(n) for n in range(self.num_processor)]
+        self.start_task_num, self.end_task_num = 0, 1
 
-        # Computation matrix
-        for task in HEFT.tasks:
-            task.comp_cost = map(int, f.readline().strip().split())
-        f.readline()    # blank line
+        for line in self.data:
+            print line
 
-        # Bandwidth matrix
-        for i in range(HEFT.num_processor):
-            HEFT.rate.append(map(int, f.readline().strip().split()))
-        f.readline()    # blank line
+        for i in range(self.num_task):
+            self.tasks[i].comp_cost = comp_cost[i]
 
-        # Data matrix
-        for i in range(HEFT.num_task):
-            HEFT.data.append(map(int, f.readline().strip().split()))
+        for task in self.tasks:
+            task.avg_comp = sum(task.comp_cost) / self.num_processor
 
-        f.close()
-
-        for task in HEFT.tasks:
-            task.avg_comp = sum(task.comp_cost) / HEFT.num_processor
-
-        self.cal_up_rank(HEFT.tasks[0])
-        self.cal_down_rank(HEFT.tasks[-1])
-
-        HEFT.tasks.sort(cmp=lambda x, y: cmp(x.up_rank, y.up_rank), reverse=True)
+        self.cal_up_rank(self.tasks[self.start_task_num])
+        self.cal_down_rank(self.tasks[self.end_task_num])
+        self.tasks.sort(cmp=lambda x, y: cmp(x.up_rank, y.up_rank), reverse=True)
 
     def cal_avg_comm(self, task1, task2):
         res = 0
-        for line in HEFT.rate:
+        for line in self.rate:
             for rate in line:
                 if rate != 0:
-                    res += HEFT.data[task1.number][task2.number] / rate
-        return res / (HEFT.num_processor ** 2 - HEFT.num_processor)
+                    res += self.data[task1.number][task2.number] / rate
+        return res / (self.num_processor ** 2 - self.num_processor)
 
     def cal_up_rank(self, task):
         longest = 0
-        for successor in HEFT.tasks:
-            if HEFT.data[task.number][successor.number] != -1:
+        for successor in self.tasks:
+            if self.data[task.number][successor.number] != -1:
                 if successor.up_rank == -1:
                     self.cal_up_rank(successor)
 
@@ -92,11 +79,11 @@ class HEFT:
         task.up_rank = task.avg_comp + longest
 
     def cal_down_rank(self, task):
-        if task == HEFT.tasks[0]:
+        if task == self.tasks[self.start_task_num]:
             task.down_rank = 0
             return
-        for pre in HEFT.tasks:
-            if HEFT.data[pre.number][task.number] != -1:
+        for pre in self.tasks:
+            if self.data[pre.number][task.number] != -1:
                 if pre.down_rank == -1:
                     self.cal_down_rank(pre)
     
@@ -105,10 +92,10 @@ class HEFT:
 
     def cal_est(self, task, processor):
         est = 0
-        for pre in HEFT.tasks:
-            if HEFT.data[pre.number][task.number] != -1:
+        for pre in self.tasks:
+            if self.data[pre.number][task.number] != -1:
                 if pre.processor_num != processor.number:
-                    c = HEFT.data[pre.number][task.number] / HEFT.rate[pre.processor_num][processor.number]
+                    c = self.data[pre.number][task.number] / self.rate[pre.processor_num][processor.number]
                 else:
                     c = 0
 
@@ -136,17 +123,17 @@ class HEFT:
                 return est
 
     def run(self):
-        for task in HEFT.tasks:
-            if task == HEFT.tasks[0]:
+        for task in self.tasks:
+            if task == self.tasks[0]:
                 w = min(task.comp_cost)
                 p = task.comp_cost.index(w)
                 task.processor_num = p
                 task.ast = 0
                 task.aft = w
-                HEFT.processors[p].time_line.append(Duration(task.number, 0, w))
+                self.processors[p].time_line.append(Duration(task.number, 0, w))
             else:
                 aft = 9999
-                for processor in HEFT.processors:
+                for processor in self.processors:
                     est = self.cal_est(task, processor)
                     if est + task.comp_cost[processor.number] < aft:
                         aft = est + task.comp_cost[processor.number]
@@ -155,14 +142,18 @@ class HEFT:
                 task.processor_num = p
                 task.ast = aft - task.comp_cost[p]
                 task.aft = aft
-                HEFT.processors[p].time_line.append(Duration(task.number, task.ast, task.aft))
-                HEFT.processors[p].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+                self.processors[p].time_line.append(Duration(task.number, task.ast, task.aft))
+                self.processors[p].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
 
     def display_result(self):
-        for t in HEFT.tasks:
+        for t in self.tasks:
             print 'task %d : up_rank = %f, down_rank = %f' % (t.number, t.up_rank, t.down_rank)
+            if t.number == self.end_task_num:
+                makespan = t.aft
 
-        for p in HEFT.processors:
+        for p in self.processors:
             print 'processor %d:' % (p.number + 1)
             for duration in p.time_line:
                 print 'task %d : ast = %d, aft = %d' % (duration.task_num + 1, duration.start, duration.end)
+
+        print 'makespan = %d' % makespan

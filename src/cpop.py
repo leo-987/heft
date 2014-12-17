@@ -1,4 +1,5 @@
 from __future__ import division
+from dag.create_input import init
 
 
 # Time duration about a task
@@ -41,77 +42,64 @@ class CPOP:
     queue = []
     cp_num = -1     # The number of critical path processor
 
-    def __init__(self, input_file):
-        f = file(input_file, 'r')
-        line = f.readline().strip().split()
-        CPOP.num_task = int(line[0])
-        CPOP.num_processor = int(line[1])
-        f.readline()    # blank line
+    def __init__(self):
+        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init()
 
-        CPOP.tasks = [Task(n) for n in range(CPOP.num_task)]
-        CPOP.processors = [Processor(n) for n in range(CPOP.num_processor)]
+        self.tasks = [Task(n) for n in range(self.num_task)]
+        self.processors = [Processor(n) for n in range(self.num_processor)]
+        self.start_task_num, self.end_task_num = 0, 1
 
-        # Computation matrix
-        for task in CPOP.tasks:
-            task.comp_cost = map(int, f.readline().strip().split())
-        f.readline()    # blank line
+        for line in self.data:
+            print line
 
-        # Bandwidth matrix
-        for i in range(CPOP.num_processor):
-            CPOP.rate.append(map(int, f.readline().strip().split()))
-        f.readline()    # blank line
+        for i in range(self.num_task):
+            self.tasks[i].comp_cost = comp_cost[i]
 
-        # Data matrix
-        for i in range(CPOP.num_task):
-            CPOP.data.append(map(int, f.readline().strip().split()))
+        for task in self.tasks:
+            task.avg_comp = sum(task.comp_cost) / self.num_processor
 
-        f.close()
-
-        for task in CPOP.tasks:
-            task.avg_comp = sum(task.comp_cost) / CPOP.num_processor
-
-        self.cal_up_rank(CPOP.tasks[0])
-        self.cal_down_rank(CPOP.tasks[-1])
+        self.cal_up_rank(self.tasks[self.start_task_num])
+        self.cal_down_rank(self.tasks[self.end_task_num])
         self.cal_critical_path()
         self.cal_critical_processor()
-        self.sort_tasks(CPOP.tasks[0])
+        self.sort_tasks(self.tasks[self.start_task_num])
 
     def cal_critical_path(self):
-        cp_length = CPOP.tasks[0].up_rank + CPOP.tasks[0].down_rank
-        for task in CPOP.tasks:
+        cp_length = self.tasks[self.start_task_num].up_rank + self.tasks[self.start_task_num].down_rank
+        for task in self.tasks:
             if round(task.up_rank + task.down_rank) == round(cp_length):
                 task.is_cp = True
 
     def cal_critical_processor(self):
-        cost = [0] * CPOP.num_processor
-        for task in CPOP.tasks:
+        cost = [0] * self.num_processor
+        for task in self.tasks:
             if task.is_cp:
-                for i in range(CPOP.num_processor):
+                for i in range(self.num_processor):
                     cost[i] += task.comp_cost[i]
-        CPOP.cp_num = cost.index(min(cost))
+        self.cp_num = cost.index(min(cost))
 
     def sort_tasks(self, task):
-        for pre in CPOP.tasks:
-            if CPOP.data[pre.number][task.number] != -1 and pre not in CPOP.queue:
+        for pre in self.tasks:
+            if self.data[pre.number][task.number] != -1 and pre not in self.queue:
                 return
 
-        CPOP.queue.append(task)
-        for successor in CPOP.tasks:
-            if CPOP.data[task.number][successor.number] != -1:
+        self.queue.append(task)
+        for successor in self.tasks:
+            if self.data[task.number][successor.number] != -1:
                 self.sort_tasks(successor)
 
     def cal_avg_comm(self, task1, task2):
         res = 0
-        for line in CPOP.rate:
+        for line in self.rate:
             for rate in line:
                 if rate != 0:
-                    res += CPOP.data[task1.number][task2.number] / rate
-        return res / (CPOP.num_processor ** 2 - CPOP.num_processor)
+                    res += self.data[task1.number][task2.number] / rate
+        return res / (self.num_processor ** 2 - self.num_processor)
 
     def cal_up_rank(self, task):
         longest = 0
-        for successor in CPOP.tasks:
-            if CPOP.data[task.number][successor.number] != -1:
+        for successor in self.tasks:
+            if self.data[task.number][successor.number] != -1:
                 if successor.up_rank == -1:
                     self.cal_up_rank(successor)
 
@@ -120,11 +108,11 @@ class CPOP:
         task.up_rank = task.avg_comp + longest
 
     def cal_down_rank(self, task):
-        if task == CPOP.tasks[0]:
+        if task == self.tasks[self.start_task_num]:
             task.down_rank = 0
             return
-        for pre in CPOP.tasks:
-            if CPOP.data[pre.number][task.number] != -1:
+        for pre in self.tasks:
+            if self.data[pre.number][task.number] != -1:
                 if pre.down_rank == -1:
                     self.cal_down_rank(pre)
     
@@ -133,10 +121,10 @@ class CPOP:
 
     def cal_est(self, task, processor):
         est = 0
-        for pre in CPOP.tasks:
-            if CPOP.data[pre.number][task.number] != -1:
+        for pre in self.tasks:
+            if self.data[pre.number][task.number] != -1:
                 if pre.processor_num != processor.number:
-                    c = CPOP.data[pre.number][task.number] / CPOP.rate[pre.processor_num][processor.number]
+                    c = self.data[pre.number][task.number] / self.rate[pre.processor_num][processor.number]
                 else:
                     c = 0
 
@@ -164,16 +152,16 @@ class CPOP:
                 return est
 
     def run(self):
-        for task in CPOP.queue:
+        for task in self.queue:
             if task.is_cp:
-                task.ast = self.cal_est(task, CPOP.processors[CPOP.cp_num])
-                task.aft = task.ast + task.comp_cost[CPOP.cp_num]
-                task.processor_num = CPOP.cp_num
-                CPOP.processors[CPOP.cp_num].time_line.append(Duration(task.number, task.ast, task.aft))
-                CPOP.processors[CPOP.cp_num].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+                task.ast = self.cal_est(task, self.processors[self.cp_num])
+                task.aft = task.ast + task.comp_cost[self.cp_num]
+                task.processor_num = self.cp_num
+                self.processors[self.cp_num].time_line.append(Duration(task.number, task.ast, task.aft))
+                self.processors[self.cp_num].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
             else:
                 aft = 9999
-                for processor in CPOP.processors:
+                for processor in self.processors:
                     est = self.cal_est(task, processor)
                     if est + task.comp_cost[processor.number] < aft:
                         aft = est + task.comp_cost[processor.number]
@@ -182,14 +170,23 @@ class CPOP:
                 task.processor_num = p
                 task.ast = aft - task.comp_cost[p]
                 task.aft = aft
-                CPOP.processors[p].time_line.append(Duration(task.number, task.ast, task.aft))
-                CPOP.processors[p].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+                self.processors[p].time_line.append(Duration(task.number, task.ast, task.aft))
+                self.processors[p].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
 
     def display_result(self):
-        for t in CPOP.tasks:
+        for t in self.tasks:
             print 'task %d : up_rank = %f, down_rank = %f' % (t.number, t.up_rank, t.down_rank)
+            if t.number == self.end_task_num:
+                makespan = t.aft
 
-        for p in CPOP.processors:
+        for p in self.processors:
             print 'processor %d:' % (p.number + 1)
             for duration in p.time_line:
                 print 'task %d : ast = %d, aft = %d' % (duration.task_num + 1, duration.start, duration.end)
+
+        print 'makespan = %d' % makespan
+
+        print 'critical path:'
+        for task in self.tasks:
+            if task.is_cp:
+                print task.number,
