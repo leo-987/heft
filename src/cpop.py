@@ -1,6 +1,9 @@
 from __future__ import division
 from dag.create_input import init
 
+"""
+This module is the CPOP algorithm.
+"""
 
 # Time duration about a task
 class Duration:

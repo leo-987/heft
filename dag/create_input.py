@@ -7,7 +7,6 @@ def init():
     build computation matrix, communication matrix, rate matrix.
     TGFF is a useful tool to generate directed acyclic graph, tfgg file represent a task graph.
     """
-
     f = file('../dag/input.tgff', 'r')
     f.readline()
     f.readline()

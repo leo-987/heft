@@ -1,6 +1,9 @@
 from __future__ import division
 from dag.create_input import init
 
+"""
+This module is the HEFT algorithm.
+"""
 
 # Time duration about a task
 class Duration:
@@ -40,6 +43,9 @@ class HEFT:
     data = []
 
     def __init__(self):
+        """
+        Initialize some parameters.
+        """
         self.num_task, self.num_processor, comp_cost, self.rate, self.data = init()
 
         self.tasks = [Task(n) for n in range(self.num_task)]
@@ -60,6 +66,9 @@ class HEFT:
         self.tasks.sort(cmp=lambda x, y: cmp(x.up_rank, y.up_rank), reverse=True)
 
     def cal_avg_comm(self, task1, task2):
+        """
+        Calculate the average communication cost between task1 and task2.
+        """
         res = 0
         for line in self.rate:
             for rate in line:
@@ -68,6 +77,10 @@ class HEFT:
         return res / (self.num_processor ** 2 - self.num_processor)
 
     def cal_up_rank(self, task):
+        """
+        Calculate the upper rank of all tasks.
+        Parameter task is the entry node of the DAG.
+        """
         longest = 0
         for successor in self.tasks:
             if self.data[task.number][successor.number] != -1:
@@ -79,6 +92,10 @@ class HEFT:
         task.up_rank = task.avg_comp + longest
 
     def cal_down_rank(self, task):
+        """
+        Calculate the down rank of all tasks.
+        Parameter task is the exit node of the DAG.
+        """
         if task == self.tasks[self.start_task_num]:
             task.down_rank = 0
             return
@@ -91,6 +108,9 @@ class HEFT:
                                      pre.down_rank + pre.avg_comp + self.cal_avg_comm(pre, task))
 
     def cal_est(self, task, processor):
+        """
+        Calculate the earliest start time of task on processor.
+        """
         est = 0
         for pre in self.tasks:
             if self.data[pre.number][task.number] != -1:
