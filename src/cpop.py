@@ -45,8 +45,8 @@ class CPOP:
     queue = []
     cp_num = -1     # The number of critical path processor
 
-    def __init__(self):
-        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init()
+    def __init__(self, filename):
+        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init(filename)
 
         self.tasks = [Task(n) for n in range(self.num_task)]
         self.processors = [Processor(n) for n in range(self.num_processor)]
@@ -65,7 +65,8 @@ class CPOP:
         self.cal_down_rank(self.tasks[self.end_task_num])
         self.cal_critical_path()
         self.cal_critical_processor()
-        self.sort_tasks(self.tasks[self.start_task_num])
+        # self.sort_tasks(self.tasks[self.start_task_num])
+        self.tasks.sort(cmp=lambda x, y: cmp(x.up_rank, y.up_rank), reverse=True)
 
     def cal_critical_path(self):
         cp_length = self.tasks[self.start_task_num].up_rank + self.tasks[self.start_task_num].down_rank
@@ -155,7 +156,7 @@ class CPOP:
                 return est
 
     def run(self):
-        for task in self.queue:
+        for task in self.tasks:
             if task.is_cp:
                 task.ast = self.cal_est(task, self.processors[self.cp_num])
                 task.aft = task.ast + task.comp_cost[self.cp_num]

@@ -42,11 +42,11 @@ class HEFT:
     rate = []
     data = []
 
-    def __init__(self):
+    def __init__(self, filename):
         """
         Initialize some parameters.
         """
-        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init()
+        self.num_task, self.num_processor, comp_cost, self.rate, self.data = init(filename)
 
         self.tasks = [Task(n) for n in range(self.num_task)]
         self.processors = [Processor(n) for n in range(self.num_processor)]
