@@ -53,7 +53,3 @@ def init(filename):
     #    print line
 
     return [num_of_tasks, num_of_processors, comp_cost, rate, data]
-
-
-if __name__ == '__main__':
-    init()
