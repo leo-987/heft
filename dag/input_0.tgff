@@ -1,0 +1,49 @@
+@TASK_GRAPH 0 {
+	APERIODIC
+
+	TASK t0_0	TYPE 0 
+	TASK t0_1	TYPE 1 
+	TASK t0_2	TYPE 2 
+	TASK t0_3	TYPE 3 
+	TASK t0_4	TYPE 4 
+	TASK t0_5	TYPE 5 
+	TASK t0_6	TYPE 6 
+	TASK t0_7	TYPE 7 
+	TASK t0_8	TYPE 8 
+	TASK t0_9	TYPE 9 
+
+	ARC a0_0 	FROM t0_0  TO  t0_1 TYPE 18
+	ARC a0_1 	FROM t0_0  TO  t0_2 TYPE 12
+	ARC a0_2 	FROM t0_0  TO  t0_3 TYPE 9
+	ARC a0_3 	FROM t0_0  TO  t0_4 TYPE 11
+	ARC a0_4 	FROM t0_0  TO  t0_5 TYPE 14
+	ARC a0_5 	FROM t0_1  TO  t0_7 TYPE 19
+	ARC a0_6 	FROM t0_1  TO  t0_8 TYPE 16
+	ARC a0_7 	FROM t0_2  TO  t0_6 TYPE 23
+	ARC a0_8 	FROM t0_3  TO  t0_7 TYPE 27
+	ARC a0_9 	FROM t0_3  TO  t0_8 TYPE 23
+	ARC a0_10 	FROM t0_4  TO  t0_8 TYPE 13
+	ARC a0_11 	FROM t0_5  TO  t0_7 TYPE 15
+	ARC a0_12 	FROM t0_6  TO  t0_9 TYPE 17
+	ARC a0_12 	FROM t0_7  TO  t0_9 TYPE 11
+	ARC a0_12 	FROM t0_8  TO  t0_9 TYPE 13
+
+	HARD_DEADLINE d0_0 ON t0_1 AT 1800
+}
+
+
+
+
+@computation_cost 0 {
+# type version p1  p2  p3
+  0    0       14  16  9
+  1    0       13  19  18
+  2    0       11  13  19
+  3    0       13  8   17
+  4    0       12  13  10
+  5    0       13  16  9
+  6    0       7   15  11
+  7    0       5   11  14
+  8    0       18  12  20
+  9    0       21  7   16
+}

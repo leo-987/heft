@@ -1,8 +1,9 @@
 from __future__ import division
 from dag.create_input import init
+from copy import deepcopy
 
 """
-This module is the CPOP algorithm.
+This module is the HEFT algorithm.
 """
 
 # Time duration about a task
@@ -24,7 +25,7 @@ class Task:
         self.down_rank = -1
         self.comp_cost = []
         self.avg_comp = 0
-        self.is_cp = False
+        self.pre_task_num = -1
 
 
 # Processor class represent a processor
@@ -35,25 +36,21 @@ class Processor:
 
 
 # A class of scheduling algorithm
-class CPOP:
-    num_task = 0
-    num_processor = 0
-    tasks = []
-    processors = []
-    rate = []
-    data = []
-    queue = []
-    cp_num = -1     # The number of critical path processor
-
+class HEFT:
     def __init__(self, filename):
+        """
+        Initialize some parameters.
+        """
         self.num_task, self.num_processor, comp_cost, self.rate, self.data = init(filename)
 
         self.tasks = [Task(n) for n in range(self.num_task)]
         self.processors = [Processor(n) for n in range(self.num_processor)]
-        self.start_task_num, self.end_task_num = 0, 1
+        self.start_task_num, self.end_task_num = 0, 9
+        self.dup_tasks = []
+        self.critical_pre_task_num = -1
 
-        for line in self.data:
-            print line
+        #for line in self.data:
+        #    print line
 
         for i in range(self.num_task):
             self.tasks[i].comp_cost = comp_cost[i]
@@ -63,35 +60,12 @@ class CPOP:
 
         self.cal_up_rank(self.tasks[self.start_task_num])
         self.cal_down_rank(self.tasks[self.end_task_num])
-        self.cal_critical_path()
-        self.cal_critical_processor()
         self.tasks.sort(cmp=lambda x, y: cmp(x.up_rank, y.up_rank), reverse=True)
 
-    def cal_critical_path(self):
-        cp_length = self.tasks[self.start_task_num].up_rank + self.tasks[self.start_task_num].down_rank
-        for task in self.tasks:
-            if round(task.up_rank + task.down_rank) == round(cp_length):
-                task.is_cp = True
-
-    def cal_critical_processor(self):
-        cost = [0] * self.num_processor
-        for task in self.tasks:
-            if task.is_cp:
-                for i in range(self.num_processor):
-                    cost[i] += task.comp_cost[i]
-        self.cp_num = cost.index(min(cost))
-
-    def sort_tasks(self, task):
-        for pre in self.tasks:
-            if self.data[pre.number][task.number] != -1 and pre not in self.queue:
-                return
-
-        self.queue.append(task)
-        for successor in self.tasks:
-            if self.data[task.number][successor.number] != -1:
-                self.sort_tasks(successor)
-
     def cal_avg_comm(self, task1, task2):
+        """
+        Calculate the average communication cost between task1 and task2.
+        """
         res = 0
         for line in self.rate:
             for rate in line:
@@ -100,6 +74,10 @@ class CPOP:
         return res / (self.num_processor ** 2 - self.num_processor)
 
     def cal_up_rank(self, task):
+        """
+        Calculate the upper rank of all tasks.
+        Parameter task is the entry node of the DAG.
+        """
         longest = 0
         for successor in self.tasks:
             if self.data[task.number][successor.number] != -1:
@@ -111,6 +89,10 @@ class CPOP:
         task.up_rank = task.avg_comp + longest
 
     def cal_down_rank(self, task):
+        """
+        Calculate the down rank of all tasks.
+        Parameter task is the exit node of the DAG.
+        """
         if task == self.tasks[self.start_task_num]:
             task.down_rank = 0
             return
@@ -123,15 +105,26 @@ class CPOP:
                                      pre.down_rank + pre.avg_comp + self.cal_avg_comm(pre, task))
 
     def cal_est(self, task, processor):
+        """
+        Calculate the earliest start time of task on processor.
+        """
         est = 0
         for pre in self.tasks:
             if self.data[pre.number][task.number] != -1:
                 if pre.processor_num != processor.number:
-                    c = self.data[pre.number][task.number] / self.rate[pre.processor_num][processor.number]
+                    for dup_task in self.dup_tasks:
+                        if dup_task.number == pre.number and dup_task.processor_num == task.processor_num:
+                            c = 0
+                            break
+                    else:
+                        c = self.data[pre.number][task.number] / self.rate[pre.processor_num][processor.number]
                 else:
                     c = 0
+                if pre.aft + c > est:
+                    est = pre.aft + c
+                    self.critical_pre_task_num = pre.number
 
-                est = max(est, pre.aft + c)
+                #est = max(est, pre.aft + c)
     
         time_slots = []
         if len(processor.time_line) == 0:
@@ -145,7 +138,6 @@ class CPOP:
                         continue
                 else:
                     time_slots.append([processor.time_line[i - 1].end, processor.time_line[i].start])
-    
             time_slots.append([processor.time_line[len(processor.time_line) - 1].end, 9999])
     
         for slot in time_slots:
@@ -154,14 +146,58 @@ class CPOP:
             if est >= slot[0] and est + task.comp_cost[processor.number] <= slot[1]:
                 return est
 
+    def duplicate(self):
+        """
+        Reduce the communication overhead according copying the redundant tasks.
+        """
+        for pre_task in self.tasks:
+            pre_processor_num = pre_task.processor_num
+            for task in self.tasks:
+                if pre_task == task or task.pre_task_num != pre_task.number:
+                    continue
+                processor_num = task.processor_num
+                if pre_processor_num == processor_num:
+                    continue
+                dup_task_ast = self.cal_est(pre_task, self.processors[processor_num])
+                dup_task_aft = dup_task_ast + pre_task.comp_cost[processor_num]
+                if dup_task_aft > task.ast:
+                    continue
+
+                dup_task = Task(pre_task.number)
+                dup_task.ast = dup_task_ast
+                dup_task.aft = dup_task_aft
+                dup_task.processor_num = processor_num
+                self.dup_tasks.append(dup_task)
+                self.processors[dup_task.processor_num].time_line.append(
+                                Duration(-1, dup_task.ast, dup_task.aft))
+                self.processors[processor_num].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+                print 'task %d dup on processor %d' % (pre_task.number, processor_num)
+
+    def reschedule(self):
+        """
+        After duplication, you should reschedule all tasks except redundant tasks.
+        """
+        # clear the time line list
+        for p in self.processors:
+            p.time_line = filter(lambda duration: duration.task_num == -1, p.time_line)
+
+        for task in self.tasks:
+            processor_num = task.processor_num
+            est = self.cal_est(task, self.processors[processor_num])
+            task.ast = est
+            task.aft = est + task.comp_cost[processor_num]
+            self.processors[task.processor_num].time_line.append(Duration(task.number, task.ast, task.aft))
+            self.processors[processor_num].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+
     def run(self):
         for task in self.tasks:
-            if task.is_cp:
-                task.ast = self.cal_est(task, self.processors[self.cp_num])
-                task.aft = task.ast + task.comp_cost[self.cp_num]
-                task.processor_num = self.cp_num
-                self.processors[self.cp_num].time_line.append(Duration(task.number, task.ast, task.aft))
-                self.processors[self.cp_num].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+            if task == self.tasks[0]:
+                w = min(task.comp_cost)
+                p = task.comp_cost.index(w)
+                task.processor_num = p
+                task.ast = 0
+                task.aft = w
+                self.processors[p].time_line.append(Duration(task.number, 0, w))
             else:
                 aft = 9999
                 for processor in self.processors:
@@ -169,12 +205,17 @@ class CPOP:
                     if est + task.comp_cost[processor.number] < aft:
                         aft = est + task.comp_cost[processor.number]
                         p = processor.number
+                        # Find the critical pre task
+                        task.pre_task_num = self.critical_pre_task_num
     
                 task.processor_num = p
                 task.ast = aft - task.comp_cost[p]
                 task.aft = aft
                 self.processors[p].time_line.append(Duration(task.number, task.ast, task.aft))
                 self.processors[p].time_line.sort(cmp=lambda x, y: cmp(x.start, y.start))
+
+        self.duplicate()
+        self.reschedule()
 
     def display_result(self):
         for t in self.tasks:
@@ -185,11 +226,11 @@ class CPOP:
         for p in self.processors:
             print 'processor %d:' % (p.number + 1)
             for duration in p.time_line:
-                print 'task %d : ast = %d, aft = %d' % (duration.task_num + 1, duration.start, duration.end)
+                if duration.task_num != -1:
+                    print 'task %d : ast = %d, aft = %d' % (duration.task_num + 1,
+                                                            duration.start, duration.end)
+
+        for dup in self.dup_tasks:
+            print 'redundant task %s on processor %d' % (dup.number + 1, dup.processor_num + 1)
 
         print 'makespan = %d' % makespan
-
-        print 'critical path:'
-        for task in self.tasks:
-            if task.is_cp:
-                print task.number,

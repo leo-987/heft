@@ -16,7 +16,7 @@ def init(filename):
     num_of_tasks = 0
     while f.readline().startswith('\tTASK'):
         num_of_tasks += 1
-    print 'Number of tasks = %d' % num_of_tasks
+    #print 'Number of tasks = %d' % num_of_tasks
 
     # Build a communication matrix
     data = [[-1 for i in range(num_of_tasks)] for i in range(num_of_tasks)]
@@ -34,7 +34,7 @@ def init(filename):
 
     # Calculate the amount of processors
     num_of_processors = len(f.readline().split()) - 3
-    print 'Number of processors = %d' % num_of_processors
+    #print 'Number of processors = %d' % num_of_processors
 
     # Build a computation matrix
     comp_cost = []
